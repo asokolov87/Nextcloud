@@ -1,23 +1,37 @@
 version: '3'
 services:
 
-  mysql:
-    image: mariadb:10.4.10
-    container_name: nextcloud-mysql
+  app:
+    container_name: app-server
+    image: nextcloud:fpm
+    expose:
+      - '80'
+      - '9000'
     volumes:
-      - mysql_data:/var/lib/mysql
-      - /etc/localtime:/etc/localtime:ro
+      - app_data:/var/www/html
+    depends_on:
+      - letsencrypt
+      - nginx
+      - mysql
+    restart: always
+
+  mysql:
+    container_name: mysql
+    image: mariadb:10.4.10
+    expose:
+      - '3306'
     environment:
       - MYSQL_ROOT_PASSWORD=mysql-root-p@ssw0rd
       - MYSQL_PASSWORD=nextcloud-p@ssw0rd
       - MYSQL_DATABASE=nextcloud
       - MYSQL_USER=nextcloud
+    volumes:
+      - mysql_data:/var/lib/mysql
     restart: always
       
-  onlyoffice-document-server:
-    container_name: onlyoffice-document-server
+  onlyoffice:
+    container_name: onlyoffice
     image: onlyoffice/documentserver:latest
-    restart: always
     environment:
       - JWT_SECRET=secret
     expose:
@@ -26,13 +40,13 @@ services:
     volumes:
       - document_data:/var/www/onlyoffice/Data
       - document_log:/var/log/onlyoffice
+    restart: always
       
   nginx:
-    container_name: nginx-server
+    container_name: nginx
     image: nginx
     labels:
       - "com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy=true"
-    restart: always
     ports:
       - 80:80
       - 443:443
@@ -42,36 +56,19 @@ services:
       - /data/nextcloud/nginx/vhost.d:/etc/nginx/vhost.d:rw
       - /data/nextcloud/nginx/html:/usr/share/nginx/html:rw
       - /data/nextcloud/nginx/certs:/etc/nginx/certs:ro
-      - /etc/localtime:/etc/localtime:ro
-      - /var/run/docker.sock:/tmp/docker.sock:ro
+    restart: always
       
   letsencrypt:
     image: jrcs/letsencrypt-nginx-proxy-companion:v1.12
-    container_name: nextcloud-letsencrypt
+    container_name: letsencrypt
     depends_on:
       - nginx
     volumes:
       - /data/nextcloud/nginx/vhost.d:/etc/nginx/vhost.d:rw
       - /data/nextcloud/nginx/html:/usr/share/nginx/html:rw
       - /data/nextcloud/nginx/certs:/etc/nginx/certs:rw
-      - /etc/localtime:/etc/localtime:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: always
     
-  app:
-    container_name: app-server
-    depends_on:
-      - letsencrypt
-      - nginx
-      - mysql
-    image: nextcloud:fpm
-    expose:
-      - '80'
-      - '9000'
-    volumes:
-      - app_data:/var/www/html
-      - /etc/localtime:/etc/localtime:ro
-    restart: always
       
 volumes:
   document_data:
